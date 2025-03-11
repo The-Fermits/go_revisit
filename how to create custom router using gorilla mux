@@ -1,0 +1,51 @@
+// custom router using gorilla mux
+package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+
+	"github.com/gorilla/mux"
+)
+
+func main() {
+	fmt.Println("Here we will see how to create a custom router")
+	// which can have restriction on request method like GET, POST etc.
+
+	r := mux.NewRouter()
+	r.HandleFunc("/", serveHome).Methods("GET") // it will only allow GET request to hit
+
+	http.ListenAndServe(":8080", r) // use r to map routes and handleFunctions
+
+}
+
+func serveHome(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "This is Home by servehome in w")
+	fmt.Println("This is not in w")
+	requestContent, err := io.ReadAll(r.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Your Requested data is : ", requestContent)
+}
+
+// need these lines to run on vs code terminal 
+/*
+Mandatory :
+
+go mod init github.com/The-Fermits/23modules
+go get -u github.com/gorilla/mux
+
+
+
+Not required now :
+
+go build .
+go mod tidy
+go mod vendor
+go run main.go
+go run -mod=vendor main.go
+
+*/
