@@ -12,7 +12,17 @@ func Home(w http.ResponseWriter, r *http.Request) {
 }
 
 func posthandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "i am a post handler function for route /post, you have successfully post a JSON data")
+	// Read the JSON data sent in the request body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Unable to read request body", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println("Received JSON data:", string(body)) // Print the received data to the terminal
+
+	// Respond to the client
+	fmt.Fprint(w, "i am a post handler function for route /post, you have successfully posted JSON data")
 }
 
 func main() {
@@ -30,7 +40,7 @@ func main() {
 		}
 	}()
 
-	performPostRequest() // perform post request 
+	performPostRequest() // perform post request
 
 }
 
@@ -49,6 +59,7 @@ func performPostRequest() {
 
 	// post this data
 	postResponse, err := http.Post(postURL, "application/json", postData)
+	// this data will go to postURL handler function (here posthandler)
 
 	if err != nil {
 		panic(err)
@@ -61,10 +72,6 @@ func performPostRequest() {
 		panic(err)
 	}
 
-	fmt.Println("Actual data :",string(content))
+	fmt.Println("Actual data :", string(content))
 
 }
-
-
-
-
