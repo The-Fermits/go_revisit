@@ -1,0 +1,70 @@
+package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+)
+
+func Home(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "This is Home")
+}
+
+func posthandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "i am a post handler function for route /post, you have successfully post a JSON data")
+}
+
+func main() {
+	fmt.Println("Here we will see how to post JSON data")
+
+	http.HandleFunc("/", Home)
+	http.HandleFunc("/post", posthandler) // Get Post Request (JSON)
+
+	// Run this in go routine (so that it did not block other piece of code)
+
+	go func() {
+		err := http.ListenAndServe(":8080", nil)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	performPostRequest() // perform post request 
+
+}
+
+const postURL string = "http://localhost:8080/post"
+
+func performPostRequest() {
+	// need some data to post (JSON data)
+	// note: use (`) not (')
+	postData := strings.NewReader(` 
+{
+"Name" :"salman"
+"Age" : "19"
+"Game" :"FB"
+}
+`)
+
+	// post this data
+	postResponse, err := http.Post(postURL, "application/json", postData)
+
+	if err != nil {
+		panic(err)
+	}
+
+	defer postResponse.Body.Close()
+
+	content, err := io.ReadAll(postResponse.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Actual data :",string(content))
+
+}
+
+
+
+
