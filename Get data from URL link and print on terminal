@@ -1,0 +1,56 @@
+package main
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func f1(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "calling dummy func1")
+}
+
+func getHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "calling GET handler")
+}
+
+func main() {
+	fmt.Println("testing localhost 8080")
+
+	// Register the routes
+	http.HandleFunc("/", f1)
+	http.HandleFunc("/get", getHandler)
+
+	// Start the server in a goroutine (non-blocking)
+	go func() {
+		err := http.ListenAndServe(":8080", nil)
+		if err != nil {
+			fmt.Println("Error starting server:", err)
+		}
+	}()
+	// Give the server a moment to start (optional but useful)
+	fmt.Println("Waiting for server to start...")
+
+	// perform Get Request 
+	PGR()
+}
+
+func PGR() {
+	getURL := "http://localhost:8080/get"
+
+	resp, err := http.Get(getURL)
+	if err != nil {
+		panic(err)
+	}
+
+	defer resp.Body.Close()
+
+	fmt.Println("status code of this get request is : ", resp.StatusCode)
+	fmt.Println("content length of this get request is : ", resp.ContentLength)
+
+	cont, err := io.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Actual Content :",string(cont)) // Convert bytes to string for readable output
+}
