@@ -1,0 +1,25 @@
+package main
+
+import (
+	"fmt"
+	"net/http"
+)
+
+func f1(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "calling dummy func1")
+}
+
+func f2(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "this is dummy func2")
+}
+
+func main() {
+	fmt.Println("testing localhost 8080")
+
+	// First, register the routes
+	http.HandleFunc("/tip", f1)
+	http.HandleFunc("/", f2)
+
+	// Then, start the server (nil is used for using inbuilt router we can use mux also)
+	http.ListenAndServe(":8080", nil)
+}
