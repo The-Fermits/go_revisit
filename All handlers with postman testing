@@ -1,0 +1,145 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/gorilla/mux"
+	// Import the UUID package
+	"github.com/google/uuid"
+)
+
+type Course struct {
+	ID    string `json:"id"` // no space around json
+	Name  string `json:"name"`
+	Price int    `json:"price"`
+}
+
+var courses []Course
+
+func main() {
+	// create router and route handle functions
+	r := mux.NewRouter()
+	r.HandleFunc("/", serveHome).Methods("GET")
+	r.HandleFunc("/getAllCourses", getAllCourses).Methods("GET")
+	r.HandleFunc("/getOneCourse/{id}", getOneCourse).Methods("GET")
+	r.HandleFunc("/addOneCourse", addOneCourse).Methods("POST")
+	r.HandleFunc("/updateOneCourse/{id}", updateOneCourse).Methods("PUT")
+	r.HandleFunc("/deleteOneCourse/{id}", deleteOneCourse).Methods("DELETE")
+	r.HandleFunc("/deleteAllCourses", deleteAllCourses).Methods("DELETE")
+
+	log.Fatal(http.ListenAndServe(":8080", r))
+}
+
+func serveHome(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "text/html")
+	fmt.Fprint(w, "<h1> This is me, serveHome(in w)</h1>")
+}
+
+func getAllCourses(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+	// Method 1 :
+	// fmt.Fprint(w, courses)
+	// Method 2 :
+	json.NewEncoder(w).Encode(courses)
+}
+
+func getOneCourse(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+
+	// acess id from r
+	params := mux.Vars(r) // this is a key-value pair
+
+	for _, course := range courses { // (_ is index here in slices)
+		if course.ID == params["id"] {
+			json.NewEncoder(w).Encode(course)
+			return
+		}
+	}
+
+	json.NewEncoder(w).Encode("No course exist with given id found")
+}
+
+func isEmpty(course *Course) bool {
+	return (course.Name == "" && course.Price == 0)
+}
+
+func addOneCourse(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+
+	if r.Body == nil {
+		json.NewEncoder(w).Encode("Please send some data , its nil")
+		return
+	}
+
+	// extract data from request Body
+	var course Course
+	json.NewDecoder(r.Body).Decode(&course)
+
+	if isEmpty(&course) {
+		json.NewEncoder(w).Encode("send some data, its empty")
+		return
+	}
+
+	course.ID = uuid.New().String()
+
+	courses = append(courses, course)
+	json.NewEncoder(w).Encode("These are new courses after add")
+	json.NewEncoder(w).Encode(courses)
+
+}
+
+func updateOneCourse(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+	// its body have course data and params have id
+
+	var course Course
+	_ = json.NewDecoder(r.Body).Decode(&course)
+
+	params := mux.Vars(r)
+
+	for index, course1 := range courses {
+		if course1.ID == params["id"] {
+			courses = append(courses[:index], courses[index+1:]...)
+			course.ID = course1.ID
+			courses = append(courses, course)
+			json.NewEncoder(w).Encode("course successfully updated")
+			return
+		}
+	}
+
+	json.NewEncoder(w).Encode("update failed,no id match with existing courses")
+
+}
+
+func deleteOneCourse(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+
+	// we have id delete that course
+	params := mux.Vars(r)
+
+	for index, course := range courses {
+		if course.ID == params["id"] {
+			courses = append(courses[:index], courses[index+1:]...)
+			json.NewEncoder(w).Encode("successfully deleted one course ")
+			return
+		}
+	}
+
+	json.NewEncoder(w).Encode("deletion failed,no id match with existing courses")
+
+}
+
+func deleteAllCourses(w http.ResponseWriter, r *http.Request) {
+	courses = nil
+	json.NewEncoder(w).Encode("All courses  deleted ")
+}
+
+
+/*
+all handlers tested by postman desktop agent 
+postman query for path query on localhost
+http://localhost:8080/deleteOneCourse/2334c09e-8f40-4bcc-9eef-8a9a149f08ae
+*/
