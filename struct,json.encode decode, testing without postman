@@ -1,0 +1,88 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+)
+
+func main() {
+
+	http.HandleFunc("/courses", serveCourses)
+	http.HandleFunc("/create", createCourse)
+	testingCreateCourse() // Simulate a POST request to test createCourse handler
+	http.ListenAndServe(":8080", nil)
+}
+
+// This is a struct (struct name: Course)
+type Course struct {
+	// Keep struct element name capital (to export) and JSON field names in lowercase
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Price int    `json:"price"`
+}
+
+func serveCourses(w http.ResponseWriter, r *http.Request) {
+	// Set response header to indicate the content is JSON
+	w.Header().Set("content-type", "application/json")
+
+	// This is a slice of type Course (struct)
+	courses := []Course{
+		{ID: "LA", Name: "Linear Algebra", Price: 100},
+		{ID: "COA", Name: "Computer Architecture", Price: 200},
+	}
+
+	// fmt.Fprint prints in Go struct format (not suitable for API responses)
+	fmt.Fprint(w, (courses))
+
+	// json.NewEncoder encodes Go structs to JSON format and writes to the response
+	json.NewEncoder(w).Encode(courses)
+}
+
+func createCourse(w http.ResponseWriter, r *http.Request) {
+	var course Course
+
+	// Decode JSON from request body into the course struct
+	err := json.NewDecoder(r.Body).Decode(&course)
+
+	if err != nil {
+		// Send an error response if JSON decoding fails
+		http.Error(w, "Invalid JSON data", http.StatusBadRequest)
+		return
+	}
+
+	// Print the received course object
+	fmt.Fprint(w, course)
+}
+
+func testingCreateCourse() {
+	// Function to simulate a POST request without using Postman or curl
+
+	// Create sample course data
+	coursedata := Course{ID: "PnS", Name: "Probability and Statistics", Price: 175}
+
+	// Convert course data to JSON
+	body, _ := json.Marshal(coursedata)
+
+	// Simulate a POST request with the JSON payload
+	req := httptest.NewRequest("POST", "/create", bytes.NewBuffer(body))
+	req.Header.Set("content-type", "application/json")
+
+	// Create a response recorder to capture the handler's output
+	recorder := httptest.NewRecorder()
+
+	// Call the createCourse handler with the simulated request
+	createCourse(recorder, req)
+
+	// Get the result (response) from the recorder
+	result := recorder.Result()
+	defer result.Body.Close() // Ensure the response body is closed after reading
+
+	// Read and print the response body and status
+	responseBody, _ := io.ReadAll(result.Body)
+	fmt.Println("Response Status:", result.Status)
+	fmt.Println("Response Body:", string(responseBody))
+}
