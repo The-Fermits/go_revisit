@@ -31,6 +31,12 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Your Requested data is : ", requestContent)
 }
 
+// Note :- we can write html response also on "/" route using <h1>...</h1>
+ fmt.Fprint(w,"<h1>This is without w</h1>") 
+	// OR 
+    w.Write([]byte("<h1>Hey this is html response by response writer</h1>"))
+
+
 // need these lines to run on vs code terminal 
 /*
 Mandatory :
