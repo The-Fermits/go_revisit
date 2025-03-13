@@ -139,6 +139,7 @@ func deleteAllCourses(w http.ResponseWriter, r *http.Request) {
 
 
 /*
+This code stores data only in RAM (variable courses)
 all handlers tested by postman desktop agent 
 postman query for path query on localhost
 http://localhost:8080/deleteOneCourse/2334c09e-8f40-4bcc-9eef-8a9a149f08ae
