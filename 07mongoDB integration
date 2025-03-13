@@ -1,0 +1,206 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/gorilla/mux"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	// Import the UUID package
+	"github.com/google/uuid"
+)
+
+type Course struct {
+	ID    string `json:"id"` // no space around json
+	Name  string `json:"name"`
+	Price int    `json:"price"`
+}
+
+var collection *mongo.Collection // this is a like  a table in SQL , do all CRUD operation on it
+// SQL : table -> row ->
+// mongo : collection -> documents
+// CRUD - create , read , update , delete
+
+func serveHome(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "text/html")
+	fmt.Fprint(w, "<h1> This is me, serveHome(in w)</h1>")
+}
+
+func connect_mongoDB() *mongo.Client {
+
+	// uri := "mongodb://localhost:27017"
+	uri := "mongodb+srv://<username>:<password>@cluster0.on5y6.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(uri))
+
+	if err != nil {
+		log.Fatal("connection Failed: ", err)
+	}
+
+	err = client.Ping(context.TODO(), nil)
+	if err != nil {
+		log.Fatal("Ping to MongoDB Atlas failed: ", err)
+	}
+	log.Println("Successfully connected to MongoDB Atlas")
+
+	// create router and route handle functions
+	collection = client.Database("courseDB").Collection("courses")
+
+	return client
+}
+
+func addOneCourse(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+
+	var course Course
+	err := json.NewDecoder(r.Body).Decode(&course)
+
+	if err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	course.ID = uuid.New().String()
+
+	// put it on mongoDB
+	_, err2 := collection.InsertOne(context.TODO(), course)
+
+	if err2 != nil {
+		http.Error(w, "Failed to insert course", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(course) // convert to json and send it to http response w
+
+}
+
+func getAllCourses(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("content-type", "application/json")
+	cursor, err := collection.Find(context.TODO(), bson.M{}) // apply bson.M filter and give it to cursor variable
+	if err != nil {
+		http.Error(w, "Failed to fetch courses", http.StatusInternalServerError)
+		return
+	}
+
+	defer cursor.Close(context.TODO())
+
+	var courses []Course
+	err = cursor.All(context.TODO(), &courses) // courses = all data of cursor
+	if err != nil {
+		http.Error(w, "Error reading from cursor", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(courses)
+}
+
+func getOneCourse(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+
+	// acees the id
+	params := mux.Vars(r)
+	courseID := params["id"]
+
+	// check if it works
+	// ideal code : 	err := collection.FindOne(context.TODO(), bson.M{"id": courseID}).Decode(&course)
+	temp := collection.FindOne(context.TODO(), bson.M{"id": courseID}) // temp is JSON
+	var course Course
+	err := temp.Decode(&course) // now course is of type Course
+
+	if err != nil {
+		json.NewEncoder(w).Encode("No course exists with the given ID")
+		return
+	}
+
+	json.NewEncoder(w).Encode(course)
+}
+
+func updateOneCourse(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+
+	// collect new data to insert
+	var course Course
+
+	if err := json.NewDecoder(r.Body).Decode(&course); err != nil {
+		json.NewEncoder(w).Encode("Invalid data")
+		return
+	}
+
+	// get ID form URL
+	params := mux.Vars(r)
+	courseID := params["id"]
+
+	// weird syntax but what can we do , can we do it in one go like update according to the course var
+	update := bson.M{"$set": bson.M{
+		"name":  course.Name,
+		"price": course.Price,
+	}}
+
+	result, err := collection.UpdateOne(context.TODO(), bson.M{"id": courseID}, update)
+
+	if err != nil || result.MatchedCount == 0 {
+		json.NewEncoder(w).Encode("Update failed, no course found with given ID")
+		return
+	}
+
+	json.NewEncoder(w).Encode("Suceessfully Updated")
+
+}
+
+func deleteOneCourse(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+	// grab the id
+	params := mux.Vars(r)
+	courseID := params["id"]
+
+	result, err := collection.DeleteOne(context.TODO(), bson.M{"id": courseID})
+
+	if err != nil || result.DeletedCount == 0 {
+		json.NewEncoder(w).Encode("No course with given ID exist")
+		return
+	}
+
+	json.NewEncoder(w).Encode("successfully deleted one course")
+
+}
+
+func deleteAllCourses(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+	_, err := collection.DeleteMany(context.TODO(), bson.M{})
+	if err != nil {
+		json.NewEncoder(w).Encode("error deleting all courses")
+		return
+	}
+	json.NewEncoder(w).Encode("all courses deleted ")
+}
+
+func main() {
+	// connect to mongoDB local server
+	client := connect_mongoDB()
+	defer client.Disconnect(context.TODO())
+
+	r := mux.NewRouter()
+	r.HandleFunc("/", serveHome).Methods("GET")
+	r.HandleFunc("/getAllCourses", getAllCourses).Methods("GET")
+	r.HandleFunc("/getOneCourse/{id}", getOneCourse).Methods("GET")
+	r.HandleFunc("/addOneCourse", addOneCourse).Methods("POST")
+	r.HandleFunc("/updateOneCourse/{id}", updateOneCourse).Methods("PUT")
+	r.HandleFunc("/deleteOneCourse/{id}", deleteOneCourse).Methods("DELETE")
+	r.HandleFunc("/deleteAllCourses", deleteAllCourses).Methods("DELETE")
+
+	log.Fatal(http.ListenAndServe(":8080", r))
+}
+
+// local MongoDB store Data on your RAM
+// i downloaded mongoDB compass to track the data easily
+// replace @ by %40 in password of connection string if needed
+// don't use insti wifi : ( 
+// need to add network ip adress in network excess 0.0.0.0/0 allows all ip's 
+// To run postman-agent , on terminal write 'Postman Agent' , let it run in background 
